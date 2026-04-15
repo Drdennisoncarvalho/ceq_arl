@@ -1,0 +1,106 @@
+---
+title: "Fundamentos do Controle Estatístico de Qualidade"
+subtitle: "Uma Abordagem Didática com R Base"
+author: "Notas de Estudo"
+format: 
+  html:
+    theme: cosmo
+    toc: true
+    toc-title: "Índice"
+    number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Introdução ao Controle Estatístico de Processos (CEP)
+
+O Controle Estatístico de Processos (CEP) é um conjunto de ferramentas focadas na compreensão e redução da variabilidade. A premissa central é que todo processo possui variação, que pode ser dividida em duas naturezas:
+
+* **Causas Comuns (Aleatórias):** Variação inerente ao sistema, esperada e previsível.
+* **Causas Especiais (Atribuíveis):** Variação decorrente de fatores externos (falha de máquina, lote de matéria-prima ruim, erro de operação).
+
+O objetivo dos gráficos de controle é detectar a presença de causas especiais para que possam ser investigadas e eliminadas.
+
+---
+
+# Gráficos de Controle para Variáveis
+
+Quando a característica de qualidade é mensurável em uma escala contínua (peso, comprimento, tempo), utilizamos gráficos de controle para variáveis. O monitoramento exige o controle da **tendência central** (média) e da **dispersão** (variabilidade).
+
+## Gráficos $\bar{x}$ e $R$ (Média e Amplitude)
+
+Utilizado quando o tamanho do subgrupo racional é pequeno (geralmente $n < 10$).
+
+### A Lógica Matemática (Demonstração)
+
+Se uma característica $x$ tem distribuição normal com média $\mu$ e desvio padrão $\sigma$, sabemos pelo Teorema Central do Limite que a média amostral $\bar{x}$ tem distribuição normal com média $\mu_{\bar{x}} = \mu$ e desvio padrão $\sigma_{\bar{x}} = \frac{\sigma}{\sqrt{n}}$.
+
+Os limites de controle de Shewhart são definidos a $\pm 3\sigma_{\bar{x}}$ da média. Logo, os limites teóricos seriam:
+$$LSC = \mu + 3\frac{\sigma}{\sqrt{n}}$$
+$$LIC = \mu - 3\frac{\sigma}{\sqrt{n}}$$
+
+Na prática, $\mu$ e $\sigma$ são desconhecidos. Estimamos $\mu$ pela grande média $\bar{\bar{x}}$ (média das médias dos subgrupos). Para estimar $\sigma$, usamos a amplitude média $\bar{R}$. A teoria estatística mostra que a variável aleatória $W = \frac{R}{\sigma}$ (amplitude relativa) tem média $d_2$, que depende de $n$. Portanto, um estimador não viesado para $\sigma$ é $\hat{\sigma} = \frac{\bar{R}}{d_2}$.
+
+Substituindo essa estimativa nos limites teóricos, temos:
+$$LSC = \bar{\bar{x}} + \frac{3}{d_2 \sqrt{n}} \bar{R}$$
+
+Para simplificar o uso no chão de fábrica, os estatísticos definiram a constante $A_2 = \frac{3}{d_2 \sqrt{n}}$.
+
+**Fórmulas Finais:**
+
+* **Gráfico da Média ($\bar{x}$):**
+    $$LSC = \bar{\bar{x}} + A_2\bar{R}$$
+    $$LC = \bar{\bar{x}}$$
+    $$LIC = \bar{\bar{x}} - A_2\bar{R}$$
+
+* **Gráfico da Amplitude ($R$):**
+    $$LSC = D_4\bar{R}$$
+    $$LC = \bar{R}$$
+    $$LIC = D_3\bar{R}$$
+*(Onde $D_3$ e $D_4$ são constantes tabeladas derivadas da variância da amplitude relativa).*
+
+### Implementação Didática em R Base
+
+Vamos simular um processo e construir o gráfico $\bar{x}$ manualmente, para entender a mecânica.
+
+```{r echo=TRUE}
+#| label: grafico-x-bar
+#| fig-cap: "Gráfico X-barra construído com R Base."
+
+# 1. Simulação de Dados (20 subgrupos de tamanho n = 5)
+set.seed(42)
+n <- 5
+m <- 20
+dados <- matrix(rnorm(m * n, mean = 100, sd = 2), ncol = n)
+
+# Introduzindo uma causa especial no subgrupo 15
+dados[15, ] <- dados[15, ] + 4 
+
+# 2. Cálculos das Estatísticas
+medias_subgrupos <- apply(dados, 1, mean)
+amplitudes_subgrupos <- apply(dados, 1, function(x) max(x) - min(x))
+
+x_bar_bar <- mean(medias_subgrupos)
+r_bar <- mean(amplitudes_subgrupos)
+
+# Constante A2 para n=5 (tabelada)
+A2 <- 0.577 
+
+# 3. Limites de Controle
+LSC_x <- x_bar_bar + A2 * r_bar
+LIC_x <- x_bar_bar - A2 * r_bar
+
+# 4. Plotagem em R Base
+plot(medias_subgrupos, type = "b", pch = 19, ylim = c(95, 107),
+     xlab = "Subgrupo", ylab = "Média Amostral",
+     main = "Gráfico de Controle X-barra")
+abline(h = x_bar_bar, col = "darkgreen", lwd = 2) # Linha Central
+abline(h = LSC_x, col = "red", lty = 2, lwd = 2)  # LSC
+abline(h = LIC_x, col = "red", lty = 2, lwd = 2)  # LIC
+
+# Destacar pontos fora de controle
+fora_controle <- which(medias_subgrupos > LSC_x | medias_subgrupos < LIC_x)
+points(fora_controle, medias_subgrupos[fora_controle], col = "red", pch = 19, cex = 1.5)
+```
